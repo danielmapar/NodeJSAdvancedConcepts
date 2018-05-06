@@ -19,7 +19,7 @@
   * ```lib```: is where all the JS code is located
     * Example: https://github.com/nodejs/node/tree/master/lib/internal/crypto/pbkdf2.js
     * This file is mostly validating inputs and forwarding this to the C++ function
-    * ```javascript
+    ```javascript
     const {
       PBKDF2
     } = process.binding('crypto');
@@ -30,7 +30,8 @@
   * ```src```: is where all the C++ is located, and where node pulls ```libuv``` and ```v8```
 
     * ```PBKDF2``` is located inside  https://github.com/nodejs/node/blob/master/src/node_crypto.cc
-    * ```cpp
+
+    ```cpp
     env->SetMethod(target, "PBKDF2", PBKDF2);
 
     void PBKDF2(const FunctionCallbackInfo<Value>& args) {
