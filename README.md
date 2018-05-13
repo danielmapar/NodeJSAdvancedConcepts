@@ -89,7 +89,7 @@ function shouldContinue() {
 while(shouldContinue()) {
   // 1) Node looks at pendingTimers and sees if any functions are ready to be called. setTimeout, setInterval
 
-  // 2) Node looks at pendingOSTasks and pendingOperations and calls relevants callbacks
+  // 2) Node looks at pendingOSTasks and pendingOperations and calls relevants callbacks (this is 99% of our code)
 
   // 3) Pause execution. Continue whenever...
   // - a new pendingOSTask is done
@@ -136,3 +136,66 @@ while(shouldContinue()) {
 ![Not Single Thread 13](./images/node_single_threaded_not13.png)
 
 ### Pending OS Tasks
+
+* Check ```node async.js```
+  * We notice that all requests are ending in an approximate time
+  ![OS networking](./images/node_libuv_os_networking.png)
+  ![OS task](./images/node_libuv_os.png)
+  * Those tasks are not related to the Thread Pull from libuv. Libuv is calling OS functions to handle it. Neither libuv nor node has code to handle network requests, it delegates it to the underline operating system.
+  ![OS Task Questions](./images/node_libuv_os_questions.png)
+
+### Summarizing the Event Loop
+  ![Summarizing Event Loop](./images/node_event_loop_steps.png)
+
+### Interview Question
+
+* Run ```node multitask.js```
+![HD Access](./images/node_hd_access.png)
+![Threads](./images/node_threads_question.png)
+* HTTPs is not using the thread pool at all, it is using the underline OS functionality.
+* FS will first make a file system call to get some file stats.
+![Thread HD](./images/node_threads_question2.png)
+* During that call the OS scheduler will notice that it needs to wait for an HD read operation. On that note, the OS will free Thread#1 for another operation to use that processing time.
+![Thread New Space](./images/node_threads_question3.png)
+* After Thread#1 is taken over by one of the PBKDF2 operations, some other PBKDF2 operation will eventually end processing. This will lead to a new space in our tread pool, and that space will be used by the ```fs``` operation to keep its execution.
+![HD Returns Stats](./images/node_threads_question4.png)
+* The HD then takes over an returns those file ```stats``` that we required previously.
+![Program Output](./images/node_threads_question5.png)
+* First the network request executes (it does not use the thread pool), then both ```crypto``` and ```fs``` libs makes use of the thread pool of 4 slots. They filled it up with 3 PBKFS calls and the stats request from ```fs``` looking for the ```multitask.js``` file.
+  * After ```fs``` required the file stats, it frees one Thread inside the pool, and that gives space for PBKFS to execute.
+  * Finally, one of the 4 PBKFSs finish processing, and the slot is then taken by ```fs``` to request the actual file data and return it to the user.
+
+
+## Cluster mode vs Worker Thread
+
+* Cluster mode: is used to start of multiple copies of node that all running your server inside them. We cannot trigger node start multiple threads, but multiple copies we get multiple instances of the event loop (kind of multi threaded)
+  * Recommended
+
+* Worker threads: They will use the Thread Pool from libuv
+  * Experimental
+
+![Cluster vs Worker Thread](./images/node_cluster_vs_worker.png)
+
+* Check ```cluster/index.js````
+  * We can use ```ab``` apache benchmark to test our cluster
+  * ```ab -c 1 -n 1 localhost:3000/```
+  * ```-c```: concurrent requests
+  * ```-n```: number of requests
+
+## PM2 (Process Manager)
+
+* ```npm install -g pm2```
+  * This is a cluster manager solutions (managing the health of a cluster)
+  * If one of your instances ever crashes, it will restart it for you
+  * ```pm2 start pm2.js -i 0```: With i = 0, PM2 will set the number of instances equal to the number of logical CPU cores in your computer.
+    * ```pm2 list```: Show basic information about your cluster
+    * ```pm2 show pm2```: To see details about our running processes
+    * ```pm2 monit```: To see details about each process
+    * ```pm2 delete pm2```: Will remove all the running children
+
+## Worker Threads
+
+  * Similar to webworkers
+  * Experimental
+  * Uses the Thread pool (libuv)
+  ![Worker Thread](./images/worker_thread.png)
