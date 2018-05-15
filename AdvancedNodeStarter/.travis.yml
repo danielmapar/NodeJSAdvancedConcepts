@@ -15,6 +15,6 @@ install:
   - npm install
   - npm run build
 script:
-  - nohup npm run start &
+  - nohup npm run start & # nohup - no hang up: will not kill process if we close the shell + & run in the background
   - sleep 3
   - npm run test
